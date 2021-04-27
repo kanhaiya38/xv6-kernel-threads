@@ -40,8 +40,11 @@ struct proc {
   pde_t* pgdir;                // Page table
   char *kstack;                // Bottom of kernel stack for this process
   enum procstate state;        // Process state
-  int pid;                     // Process ID
+  int tgid;                    // Thread group ID
+  int pid;                     // Process/Thread ID
   struct proc *parent;         // Parent process
+  struct proc *group_leader;   // Thread group
+  uint thread_count;           // Number of threads in the thread group
   struct trapframe *tf;        // Trap frame for current syscall
   struct context *context;     // swtch() here to run process
   void *chan;                  // If non-zero, sleeping on chan
