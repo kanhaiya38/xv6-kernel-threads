@@ -82,7 +82,6 @@ sys_sleep(void)
   int n;
   uint ticks0;
 
-  cprintf("here\n");
   if(argint(0, &n) < 0)
     return -1;
   acquire(&tickslock);

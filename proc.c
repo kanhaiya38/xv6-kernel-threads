@@ -198,6 +198,9 @@ fork(void)
   }
   np->sz = curproc->sz;
   np->parent = curproc;
+  np->group_leader = np;
+  np->thread_count = 1;
+  np->tgid = np->group_leader->pid;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
@@ -227,6 +230,8 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, uint flag
   int i, pid;
   struct proc *np;
   struct proc *curproc = myproc();
+  uint ustack[3];
+  uint sp;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -240,12 +245,27 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, uint flag
     np->state = UNUSED;
     return -1;
   }
-  np->sz = curproc->sz;
-  np->parent = curproc;
+  np->sz = curproc->group_leader->sz;
+  np->parent = curproc->parent;
+  np->group_leader = curproc->group_leader;
+  np->tgid = np->group_leader->tgid;
+  np->thread_count++;
+  np->pgdir = curproc->pgdir;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
+
+  sp = (uint)stack;
+  ustack[0] = 0xffffffff;
+  ustack[1] = (uint)arg1;
+  ustack[2] = (uint)arg2;
+  sp -= 3 * 4;
+  if(copyout(np->pgdir, sp, ustack, 3*4) < 0)
+    return -1;
+
+  np->tf->eip = (uint)fn;
+  np->tf->esp = sp;
 
   for(i = 0; i < NOFILE; i++)
     if(curproc->ofile[i])
@@ -274,6 +294,8 @@ exit(void)
   struct proc *p;
   int fd;
 
+  procdump();
+  cprintf("exiting %d\n", curproc->pid);
   if(curproc == initproc)
     panic("init exiting");
 
@@ -293,7 +315,9 @@ exit(void)
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
-  wakeup1(curproc->parent);
+  if(curproc->group_leader == curproc)
+    wakeup1(curproc->parent);
+  // wakeup1(curproc->group_leader);
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
