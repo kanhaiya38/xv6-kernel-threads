@@ -317,7 +317,8 @@ exit(void)
   // Parent might be sleeping in wait().
   if(curproc->group_leader == curproc)
     wakeup1(curproc->parent);
-  // wakeup1(curproc->group_leader);
+  else
+    wakeup1(curproc->group_leader);
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -376,6 +377,63 @@ wait(void)
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
+}
+
+int
+join(int pid)
+{
+  struct proc *p;
+  struct proc *curproc = myproc();
+  
+  acquire(&ptable.lock);
+  // Scan through table looking for exited children.
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid) {
+      if (p->tgid == curproc->tgid && p->group_leader == curproc->group_leader)
+        break;
+      else  {
+        release(&ptable.lock);
+        return -1;
+      }
+    }
+  }
+
+  // No point waiting if we don't have any thread pid.
+  if(p->pid != pid) {
+    release(&ptable.lock);
+    return -1;
+  }
+
+  while(p->state != ZOMBIE) {
+    // No point waiting if the current process is killed;
+    if(curproc->killed){
+      release(&ptable.lock);
+      return -1;
+    }
+    // Wait for thread to exit.
+    sleep(curproc, &ptable.lock);
+  }
+
+  if (p->tgid != p->pid && p->group_leader != p) {
+    // Found one.
+    pid = p->pid;
+    kfree(p->kstack);
+    p->kstack = 0;
+    // freevm(p->pgdir);
+    p->tgid = 0;
+    p->pid = 0;
+    p->group_leader = 0;
+    p->thread_count = 0;
+    p->parent = 0;
+    p->name[0] = 0;
+    p->killed = 0;
+    p->state = UNUSED;
+    release(&ptable.lock);
+    return pid;
+  }
+
+  release(&ptable.lock);
+  return -1;
 }
 
 //PAGEBREAK: 42

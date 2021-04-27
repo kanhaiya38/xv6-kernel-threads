@@ -47,6 +47,16 @@ sys_wait(void)
 }
 
 int
+sys_join(void)
+{
+  int tid;
+  if(argint(0, &tid) < 0)
+    return -1;
+
+  return join(tid);
+}
+
+int
 sys_kill(void)
 {
   int pid;
