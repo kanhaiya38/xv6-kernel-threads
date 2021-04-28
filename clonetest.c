@@ -3,7 +3,8 @@
 #include "user.h"
 #include "clone.h"
 
-#define N  1000
+#define N  0
+char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
 
 void thread_func(void *a, void *b) {
   int *one = (int *)a;
@@ -101,10 +102,60 @@ child_fork_test(void)
   exit();
 }
 
+void child_exec_test_func(void *a, void *b) {
+  // sleep(1000);
+  if(exec("echo", echoargv) < 0){
+    printf(1, "exec failed\n");
+    exit();
+  }
+  printf(1, "Child exec test FAILED\n");
+  exit();
+}
+
+void
+child_exec_test(void) {
+  printf(1, "child exec test\n");
+  int a = 1;
+  int b = 2;
+  int n;
+  void *stack = malloc(4096);
+  int tid;
+  printf(1, "arg1 is %d\n", a);
+  printf(1, "arg2 is %d\n", b);
+  tid = clone(&child_exec_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  int tids[N];
+  for(n=0; n<N; n++){
+    tids[n] = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+    if(tids[n] < 0) {
+      printf(1, "clone failed\n");
+      exit();
+    }
+  }
+  // sleep(1000);
+  if(join(tid)< 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  for(n=0; n<N; n++){
+    if(join(tids[n]) < 0) {
+      printf(1, "join failed\n");
+      exit();
+    }
+  }
+
+  printf(1, "child exec test FAILED\n");
+  exit();
+}
+
 int
 main(void)
 {
   // clonetest();
-  child_fork_test();
+  // child_fork_test();
+  child_exec_test();
   exit();
 }

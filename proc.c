@@ -127,6 +127,9 @@ userinit(void)
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
+  p->group_leader = p;
+  p->tgid = p->pid;
+  p->thread_count = 1;
   p->sz = PGSIZE;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
@@ -172,6 +175,7 @@ growproc(int n)
   return 0;
 }
 
+// TODO 1: what will happen if a thread calls fork?
 // Create a new process copying p as the parent.
 // Sets up stack to return as if from system call.
 // Caller must set state of returned proc to RUNNABLE.
@@ -247,7 +251,7 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
   if(flags & CLONE_THREAD) {
     np->parent = curproc->group_leader->parent;
     np->group_leader = curproc->group_leader;
-    np->thread_count++;
+    np->group_leader->thread_count++;
   } else {
     np->parent = curproc->group_leader; // wait todo 1.
     np->group_leader = np;
@@ -321,10 +325,14 @@ exit(void)
   acquire(&ptable.lock);
 
   // Parent might be sleeping in wait().
-  if(curproc->group_leader == curproc)
+  if(curproc->group_leader == curproc) {
+    cprintf("parent wake up\n");
     wakeup1(curproc->parent);
-  else
+  }
+  else {
+    cprintf("group leader wake up\n");
     wakeup1(curproc->group_leader);
+  }
 
   // Pass abandoned children to init.
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
@@ -659,7 +667,8 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %d %s %s", p->tgid, p->pid, state, p->name);
+    if(p->pid != 1)
+      cprintf("%d %d %d %s %s", p->pid, p->tgid, p->parent->pid, state, p->name);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)
