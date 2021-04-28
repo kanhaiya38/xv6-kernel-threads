@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "clone.h"
 
 #define N  1000
 
@@ -19,11 +20,10 @@ clonetest(void)
   int a = 1;
   int b = 2;
   void *stack = malloc(4096);
-  uint flags = 1;
   int tid;
   printf(1, "arg1 is %d\n", a);
   printf(1, "arg2 is %d\n", b);
-  tid = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, flags);
+  tid = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -39,9 +39,72 @@ clonetest(void)
   exit();
 }
 
+void
+child_fork_test_func1(void *a, void *b) {
+  int pid;
+
+  pid = fork();
+  if(pid < 0){
+    printf(1, "fork failed\n");
+    exit();
+  } 
+  if(pid != 0) *(int *)a = pid;
+  // printf(1, "child is %d\n", pid);
+  // if(pid == 0) printf(1, "i am child\n");
+  // else printf(1, "i am parent\n");
+  exit();
+}
+
+void
+child_fork_test_func2(void *a, void *b) {
+  if(wait() < 0) 
+    printf(1, "clone child fork test FAILED\n");
+  else
+    printf(1, "clone child fork test OK\n");
+  exit();
+}
+
+void
+child_fork_test(void)
+{
+  printf(1, "clone child fork test\n");
+  int a = 1;
+  int b = 2;
+  int tid1, tid2;
+  void *stack1 = malloc(4096), *stack2 = malloc(4096);
+
+  tid1 = clone(&child_fork_test_func1, (void *)&a, (void *)&b, stack1+4096, CLONE_THREAD);
+  if(tid1 < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  sleep(100);
+  tid2 = clone(&child_fork_test_func2, (void *)&a, (void *)&b, stack2+4096, CLONE_THREAD);
+  if(tid2 < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+
+  // sleep(1000);
+  if(join(tid1)< 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  if(join(tid2)< 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+
+  // if()
+
+  printf(1, "clone child fork test OK\n");
+  exit();
+}
+
 int
 main(void)
 {
-  clonetest();
+  // clonetest();
+  child_fork_test();
   exit();
 }

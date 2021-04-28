@@ -59,3 +59,10 @@ struct proc {
 //   original data and bss
 //   fixed-size stack
 //   expandable heap
+
+struct process_table {
+  struct spinlock lock;
+  struct proc proc[NPROC];
+};
+
+extern struct process_table ptable;

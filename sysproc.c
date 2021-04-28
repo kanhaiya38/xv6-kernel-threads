@@ -5,6 +5,7 @@
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
+#include "spinlock.h"
 #include "proc.h"
 
 int
@@ -17,7 +18,7 @@ int sys_clone(void)
 {
   void (*fn)(void*, void*);
   void *arg1, *arg2, *stack;
-  uint flags;
+  int flags;
 
   if (argptr(0, (char **)&fn, 0) < 0)
     return -1;
@@ -27,7 +28,7 @@ int sys_clone(void)
     return -1;
   if (argint(3, (int *)&stack) < 0)
     return -1;
-  if (argint(4, (int *)&flags) < 0)
+  if (argint(4, &flags) < 0)
     return -1;
 
   return clone(fn, arg1, arg2, stack, flags);

@@ -4,13 +4,11 @@
 #include "memlayout.h"
 #include "mmu.h"
 #include "x86.h"
-#include "proc.h"
 #include "spinlock.h"
+#include "proc.h"
+#include "clone.h"
 
-struct {
-  struct spinlock lock;
-  struct proc proc[NPROC];
-} ptable;
+struct process_table ptable;
 
 static struct proc *initproc;
 
@@ -197,7 +195,7 @@ fork(void)
     return -1;
   }
   np->sz = curproc->sz;
-  np->parent = curproc;
+  np->parent = curproc->group_leader;
   np->group_leader = np;
   np->thread_count = 1;
   np->tgid = np->group_leader->pid;
@@ -225,7 +223,7 @@ fork(void)
 }
 
 int
-clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, uint flags)
+clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags)
 {
   int i, pid;
   struct proc *np;
@@ -245,11 +243,19 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, uint flag
     np->state = UNUSED;
     return -1;
   }
+  // clone thread flag
+  if(flags & CLONE_THREAD) {
+    np->parent = curproc->group_leader->parent;
+    np->group_leader = curproc->group_leader;
+    np->thread_count++;
+  } else {
+    np->parent = curproc->group_leader; // wait todo 1.
+    np->group_leader = np;
+    np->thread_count = 1;
+  }
+  np->tgid = np->group_leader->pid;
+
   np->sz = curproc->group_leader->sz;
-  np->parent = curproc->parent;
-  np->group_leader = curproc->group_leader;
-  np->tgid = np->group_leader->tgid;
-  np->thread_count++;
   np->pgdir = curproc->pgdir;
   *np->tf = *curproc->tf;
 
@@ -335,6 +341,11 @@ exit(void)
   panic("zombie exit");
 }
 
+// TODO 1:
+// If one of the threads in a thread group creates a child using fork,
+// then any thread in the group can wait for that child.
+// Q 1. Who should be the parent of that child
+
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
@@ -349,7 +360,7 @@ wait(void)
     // Scan through table looking for exited children.
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->parent != curproc)
+      if(p->parent != curproc->group_leader) // wait todo 1.
         continue;
       havekids = 1;
       if(p->state == ZOMBIE){
@@ -648,7 +659,7 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    cprintf("%d %s %s", p->pid, state, p->name);
+    cprintf("%d %d %s %s", p->tgid, p->pid, state, p->name);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);
       for(i=0; i<10 && pc[i] != 0; i++)

@@ -2,10 +2,16 @@
 #include "param.h"
 #include "memlayout.h"
 #include "mmu.h"
+#include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
 #include "x86.h"
 #include "elf.h"
+
+// TODO 1: man clone VM_THREAD
+// If any of the threads in a thread group performs an exec,
+// then all threads other than the thread group leader are terminated,
+// and the new program is executed in the thread group leader.
 
 int
 exec(char *path, char **argv)
@@ -13,11 +19,33 @@ exec(char *path, char **argv)
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
+  struct proc *p;
   struct elfhdr elf;
   struct inode *ip;
   struct proghdr ph;
   pde_t *pgdir, *oldpgdir;
   struct proc *curproc = myproc();
+
+  // exec todo 1.
+  if(curproc->thread_count > 1) {
+    acquire(&ptable.lock);
+
+    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+      if(p->tgid == curproc->tgid) {
+        if(p->pid == p->tgid && p->group_leader == p) 
+          curproc = p;
+        else {
+          release(&ptable.lock);
+          kill(p->pid);
+          acquire(&ptable.lock);
+        }
+      }
+    }
+
+    release(&ptable.lock);
+  }
+
+  curproc->thread_count = 1;
 
   begin_op();
 
