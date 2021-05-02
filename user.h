@@ -23,7 +23,8 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags);
+int clone(void (*fn)(void *, void *), void *arg1, void *arg2,
+          void *stack, int flags);
 int join(int tid);
 int tkill(int tid);
 int gettid(void);
@@ -41,3 +42,20 @@ void* memset(void*, int, uint);
 void* malloc(uint);
 void free(void*);
 int atoi(const char*);
+
+// kthread.c
+typedef struct kthread_t {
+  uint tid;
+  void *stack;
+} kthread_t;
+
+int kthread_create(kthread_t *thread, void (*start_routine)(void *, void *),
+                   void *arg1, void *arg2);
+int kthread_join(kthread_t *thread);
+int kthread_kill(kthread_t *thread);
+void kthread_exit();
+// int kthread_lock();
+// int kthread_unlock();
+// int kthread_mutex_lock();
+// int kthread_mutex_unlock();
+

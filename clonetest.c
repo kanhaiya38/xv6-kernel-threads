@@ -271,7 +271,7 @@ clone_vm_test()
     printf(1, "clone failed\n");
     exit();
   }
-  if(join(tid)< 0) {
+  if(join(tid) < 0) {
     printf(1, "join failed\n");
     exit();
   }
@@ -340,14 +340,47 @@ gettid_test()
   printf(1, "gettid test OK\n");
 }
 
+void kthread_test_func(void *a, void *b) {
+  *(int *)a = *(int *)a + 100;
+  *(int *)b = *(int *)b + 100;
+  kthread_exit();
+}
+
+void
+kthread_test()
+{
+  printf(1, "basic kthread test\n");
+  kthread_t kt;
+  a = 1;
+  b = 2;
+
+  if(kthread_create(&kt, &thread_func, (void *)&a, (void *)&b) < 0) {
+    printf(1, "kthread_create failed\n");
+    exit();
+  }
+
+  if(kthread_join(&kt) < 0) {
+    printf(1, "kthread_join failed\n");
+    exit();
+  }
+
+  if(a != 101 || b != 102) {
+    printf(1, "basic kthread test OK\n");
+    exit();
+  }
+  
+  printf(1, "basic kthread test OK\n");
+}
+
 int
 main(void)
 {
+  kthread_test();
   // clonetest();
   // child_fork_test();
   // child_exec_test();
   // clone_vm_test();
-  gettid_test();
+  // gettid_test();
   // tkill_test();
   // clone_fs_test();
   // clone_files_test();
