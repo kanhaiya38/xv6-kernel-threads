@@ -354,7 +354,7 @@ kthread_test()
   a = 1;
   b = 2;
 
-  if(kthread_create(&kt, &thread_func, (void *)&a, (void *)&b) < 0) {
+  if(kthread_create(&kt, &kthread_test_func, (void *)&a, (void *)&b) < 0) {
     printf(1, "kthread_create failed\n");
     exit();
   }
@@ -365,17 +365,62 @@ kthread_test()
   }
 
   if(a != 101 || b != 102) {
-    printf(1, "basic kthread test OK\n");
+    printf(1, "basic kthread test FAILED\n");
     exit();
   }
   
   printf(1, "basic kthread test OK\n");
 }
 
+kthread_lock_t lock;
+#define L 10
+#define NL 1e3
+void kthread_lock_test_func(void *a, void *b) {
+  int i;
+  kthread_lock(&lock);
+  for(i = 0; i < NL; i++) {
+    glob++;
+  }
+  kthread_unlock(&lock);
+  kthread_exit();
+}
+
+void
+kthread_lock_test()
+{
+  printf(1, "kthread lock test\n");
+  kthread_t kts[L];
+  int i;
+  glob = 0;
+
+  kthread_init_lock(&lock);
+
+  for(i = 0; i < L; i++) {
+    if(kthread_create(&kts[i], &kthread_lock_test_func, (void *)&a, (void *)&b) < 0) {
+      printf(1, "kthread_create failed\n");
+      exit();
+    }
+  }
+  for(i = 0; i < L; i++) {
+    if(kthread_join(&kts[i]) < 0) {
+      printf(1, "kthread_join failed\n");
+      exit();
+    }
+  }
+
+  if(glob != L * NL) {
+    printf(1, "kthread lock FAILED\n");
+    exit();
+  }
+  
+  printf(1, "kthread lock test OK\n");
+}
+
 int
 main(void)
 {
-  kthread_test();
+  // kthread_test();
+  kthread_lock_test();
   // clonetest();
   // child_fork_test();
   // child_exec_test();

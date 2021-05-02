@@ -44,6 +44,12 @@ void free(void*);
 int atoi(const char*);
 
 // kthread.c
+typedef struct kthread_lock_t {
+  uint ticket;
+  char *name;
+  uint turn;
+} kthread_lock_t;
+
 typedef struct kthread_t {
   uint tid;
   void *stack;
@@ -54,8 +60,9 @@ int kthread_create(kthread_t *thread, void (*start_routine)(void *, void *),
 int kthread_join(kthread_t *thread);
 int kthread_kill(kthread_t *thread);
 void kthread_exit();
-// int kthread_lock();
-// int kthread_unlock();
+void kthread_init_lock(kthread_lock_t *lk);
+void kthread_lock();
+void kthread_unlock();
 // int kthread_mutex_lock();
 // int kthread_mutex_unlock();
 
