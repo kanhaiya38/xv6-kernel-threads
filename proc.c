@@ -397,6 +397,7 @@ exit(void)
 int
 wait(void)
 {
+  // cprintf("entering wait\n");
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
@@ -421,6 +422,7 @@ wait(void)
         p->killed = 0;
         p->state = UNUSED;
         release(&ptable.lock);
+        // cprintf("exiting wait\n");
         return pid;
       }
     }
@@ -431,6 +433,7 @@ wait(void)
       return -1;
     }
 
+    // cprintf("waiting...\n");
     // Wait for children to exit.  (See wakeup1 call in proc_exit.)
     sleep(curproc, &ptable.lock);  //DOC: wait-sleep
   }
