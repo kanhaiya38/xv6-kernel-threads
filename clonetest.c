@@ -6,6 +6,9 @@
 
 #define N  0
 char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
+int a, b;
+void *stack, *stack1, *stack2;
+int tid, tid1, tid2;
 
 void thread_func(void *a, void *b) {
   int *one = (int *)a;
@@ -19,10 +22,10 @@ void thread_func(void *a, void *b) {
 void
 clonetest(void)
 {
-  int a = 1;
-  int b = 2;
-  void *stack = malloc(4096);
-  int tid;
+  printf(1, "basic clone test\n");
+  a = 1;
+  b = 2;
+  stack = malloc(4096);
   printf(1, "arg1 is %d\n", a);
   printf(1, "arg2 is %d\n", b);
   tid = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
@@ -33,12 +36,13 @@ clonetest(void)
   // sleep(1000);
   if(join(tid)< 0) {
     printf(1, "join failed\n");
+    printf(1, "basic clone test FAILED\n");
     exit();
   }
 
   printf(1, "arg1 is %d\n", a);
   printf(1, "arg2 is %d\n", b);
-  exit();
+  printf(1, "basic clone test OK\n");
 }
 
 void
@@ -70,9 +74,8 @@ void
 child_fork_test(void)
 {
   printf(1, "clone child fork test\n");
-  int a = 1;
-  int b = 2;
-  int tid1, tid2;
+  a = 1;
+  b = 2;
   void *stack1 = malloc(4096), *stack2 = malloc(4096);
 
   tid1 = clone(&child_fork_test_func1, (void *)&a, (void *)&b, stack1+4096, CLONE_THREAD);
@@ -88,19 +91,16 @@ child_fork_test(void)
   }
 
   // sleep(1000);
-  if(join(tid1)< 0) {
+  if(join(tid1) < 0) {
     printf(1, "join failed\n");
     exit();
   }
-  if(join(tid2)< 0) {
+  if(join(tid2) < 0) {
     printf(1, "join failed\n");
     exit();
   }
-
-  // if()
 
   printf(1, "clone child fork test OK\n");
-  exit();
 }
 
 void child_exec_test_func(void *a, void *b) {
@@ -116,13 +116,8 @@ void child_exec_test_func(void *a, void *b) {
 void
 child_exec_test(void) {
   printf(1, "child exec test\n");
-  int a = 1;
-  int b = 2;
   int n;
-  void *stack = malloc(4096);
-  int tid;
-  printf(1, "arg1 is %d\n", a);
-  printf(1, "arg2 is %d\n", b);
+  stack = malloc(4096);
   tid = clone(&child_exec_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
   if(tid < 0) {
     printf(1, "clone failed\n");
@@ -167,9 +162,9 @@ void
 clone_files_test(void)
 {
   printf(1, "clone files test\n");
-  int fd, tid, b;
+  int fd;
   char str[10];
-  void *stack = malloc(4096);
+  stack = malloc(4096);
 
   fd = open("clone_files_test.txt", O_CREATE | O_RDWR);
   if(fd < 0) {
@@ -234,8 +229,7 @@ void
 clone_fs_test(void)
 {
   printf(1, "clone fs test\n");
-  int a, tid, b;
-  void *stack = malloc(4096);
+  stack = malloc(4096);
 
   tid = clone(&clone_fs_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_FS);
   if(tid < 0) {
@@ -270,8 +264,7 @@ void
 clone_vm_test()
 {
   printf(1, "clone vm test\n");
-  int a, tid, b;
-  void *stack = malloc(4096);
+  stack = malloc(4096);
 
   tid = clone(&clone_vm_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_VM);
   if(tid < 0) {
@@ -296,8 +289,8 @@ main(void)
   // clonetest();
   // child_fork_test();
   // child_exec_test();
+  // clone_vm_test();
   // clone_fs_test();
   // clone_files_test();
-  clone_vm_test();
   exit();
 }
