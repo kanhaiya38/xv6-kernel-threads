@@ -247,23 +247,59 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
     np->state = UNUSED;
     return -1;
   }
-  // clone thread flag
+
+  np->flags = flags;
+
+  // CLONE_PARENT flag
+  // CLONE_PARENT first then CLONE_THREAD because
+  // A new thread created with CLONE_THREAD has the same parent process
+  // as the process that made the clone call (i.e., like CLONE_PARENT),
+  if(flags & CLONE_PARENT) {
+    np->parent = curproc->group_leader->parent;
+  } else {
+    np->parent = curproc->group_leader; // wait todo 1.
+  }
+  // =============================
+
+  // CLONE_THREAD flag
   if(flags & CLONE_THREAD) {
     np->parent = curproc->group_leader->parent;
     np->group_leader = curproc->group_leader;
     np->group_leader->thread_count++;
   } else {
-    np->parent = curproc->group_leader; // wait todo 1.
     np->group_leader = np;
     np->thread_count = 1;
+    // np->parent = curproc->group_leader; // wait todo 1.
   }
   np->tgid = np->group_leader->pid;
+  // =============================
+
+
+  // CLONE_FILES flag
+  if(flags & CLONE_FILES) {
+    for(i = 0; i < NOFILE; i++)
+      if(curproc->ofile[i])
+        np->ofile[i] = curproc->ofile[i];
+  } else {
+    for(i = 0; i < NOFILE; i++)
+      if(curproc->ofile[i])
+        np->ofile[i] = filedup(curproc->ofile[i]);
+  }
+  // =============================
+
+  // CLONE_FS flag
+  if(flags & CLONE_FS) {
+    np->cwd = curproc->cwd;
+  } else {
+    np->cwd = idup(curproc->cwd);
+  }
+  // =============================
 
   np->sz = curproc->group_leader->sz;
   np->pgdir = curproc->pgdir;
   *np->tf = *curproc->tf;
 
-  // Clear %eax so that fork returns 0 in the child.
+  // Clear %eax so that clone returns 0 in the child.
   np->tf->eax = 0;
 
   sp = (uint)stack;
@@ -277,10 +313,6 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
   np->tf->eip = (uint)fn;
   np->tf->esp = sp;
 
-  for(i = 0; i < NOFILE; i++)
-    if(curproc->ofile[i])
-      np->ofile[i] = filedup(curproc->ofile[i]);
-  np->cwd = idup(curproc->cwd);
 
   safestrcpy(np->name, curproc->name, sizeof(curproc->name));
 
@@ -310,10 +342,13 @@ exit(void)
     panic("init exiting");
 
   // Close all open files.
-  for(fd = 0; fd < NOFILE; fd++){
-    if(curproc->ofile[fd]){
-      fileclose(curproc->ofile[fd]);
-      curproc->ofile[fd] = 0;
+  if(!(curproc->flags & CLONE_FILES)) {
+    for(fd = 0; fd < NOFILE; fd++){
+      if(curproc->ofile[fd]){
+        cprintf("closing %d\n", fd);
+        fileclose(curproc->ofile[fd]);
+        curproc->ofile[fd] = 0;
+      }
     }
   }
 
@@ -667,7 +702,9 @@ procdump(void)
       state = states[p->state];
     else
       state = "???";
-    if(p->pid != 1)
+    if(p->pid == 1)
+      cprintf("%d %d 0 %s %s", p->pid, p->tgid, state, p->name);
+    else
       cprintf("%d %d %d %s %s", p->pid, p->tgid, p->parent->pid, state, p->name);
     if(p->state == SLEEPING){
       getcallerpcs((uint*)p->context->ebp+2, pc);

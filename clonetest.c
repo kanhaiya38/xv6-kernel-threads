@@ -1,6 +1,7 @@
 #include "types.h"
 #include "stat.h"
 #include "user.h"
+#include "fcntl.h"
 #include "clone.h"
 
 #define N  0
@@ -151,11 +152,118 @@ child_exec_test(void) {
   exit();
 }
 
+void
+clone_files_test_func(void *a, void *b)
+{
+  int *fd = (int *)a;
+  if (write(*fd, "test", 4) != 4) {
+    printf(1, "write failed\n");
+  }
+  // close(*fd);
+  exit();
+}
+
+void
+clone_files_test(void)
+{
+  printf(1, "clone files test\n");
+  int fd, tid, b;
+  char str[10];
+  void *stack = malloc(4096);
+
+  fd = open("clone_files_test.txt", O_CREATE | O_RDWR);
+  if(fd < 0) {
+    printf(1, "open failed\n");
+    exit();
+  }
+
+  tid = clone(&clone_files_test_func, (void *)&fd, (void *)&b, stack+4096, CLONE_THREAD | CLONE_FILES);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    close(fd);
+    exit();
+  }
+  if(join(tid)< 0) {
+    printf(1, "join failed\n");
+    close(fd);
+    exit();
+  }
+
+  if(write(fd, "file", 4) != 4) {
+    printf(1, "write failed\n");
+    close(fd);
+    exit();
+  }
+  close(fd);
+
+  fd = open("clone_files_test.txt", O_RDONLY);
+  if(fd < 0) {
+    printf(1, "open failed\n");
+    exit();
+  }
+
+  if(read(fd, str, 8) != 8 || strcmp(str, "testfile")) {
+    printf(1, "clone files test FAILED\n");
+    close(fd);
+    exit();
+  }
+  close(fd);
+  if(unlink("clone_files_test.txt") < 0){
+    printf(1, "unlink failed\n");
+    exit();
+  }
+
+  printf(1, "clone files test OK\n");
+}
+
+void
+clone_fs_test_func(void *a, void *b)
+{
+  if(mkdir("test") < 0) {
+    printf(1, "mkdir failed\n");
+    exit();
+  }
+  if(chdir("test") < 0) {
+    printf(1, "chdir failed\n");
+    exit();
+  }
+  exit();
+}
+
+void
+clone_fs_test(void)
+{
+  printf(1, "clone fs test\n");
+  int a, tid, b;
+  void *stack = malloc(4096);
+
+  tid = clone(&clone_fs_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_FS);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  if(join(tid)< 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  if (chdir("../") < 0){
+    printf(1, "clone fs test FAILED\n");
+    exit();
+  }
+  if (unlink("test") < 0){
+    printf(1, "unlink failed\n");
+    exit();
+  }
+  printf(1, "clone fs test OK\n");
+}
+
 int
 main(void)
 {
   // clonetest();
   // child_fork_test();
-  child_exec_test();
+  // child_exec_test();
+  clone_fs_test();
+  clone_files_test();
   exit();
 }

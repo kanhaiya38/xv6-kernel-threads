@@ -8,14 +8,18 @@
 #include "x86.h"
 #include "elf.h"
 
-// TODO 1: man clone VM_THREAD
+// TODO 1: man clone CLONE_THREAD
 // If any of the threads in a thread group performs an exec,
 // then all threads other than the thread group leader are terminated,
 // and the new program is executed in the thread group leader.
+// TODO 2: man clone CLONE_FILES
+// If a process sharing a file descriptor table calls execve(2),
+// its file descriptor table is duplicated (unshared).
 
 int
 exec(char *path, char **argv)
 {
+  cprintf("entering exec\n");
   char *s, *last;
   int i, off;
   uint argc, sz, sp, ustack[3+MAXARG+1];
@@ -134,6 +138,7 @@ exec(char *path, char **argv)
   curproc->tf->esp = sp;
   switchuvm(curproc);
   freevm(oldpgdir);
+  cprintf("exiting from exec\n");
   return 0;
 
  bad:
