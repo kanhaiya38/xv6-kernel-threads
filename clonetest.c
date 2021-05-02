@@ -20,15 +20,16 @@ void thread_func(void *a, void *b) {
 }
 
 void
-clonetest(void)
+clone_test(void)
 {
   printf(1, "basic clone test\n");
   a = 1;
   b = 2;
-  stack = malloc(4096);
+  stack = malloc(PGSIZE);
   printf(1, "arg1 is %d\n", a);
   printf(1, "arg2 is %d\n", b);
-  tid = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+  tid = clone(&thread_func, (void *)&a, (void *)&b,
+              stack+PGSIZE, CLONE_THREAD | CLONE_VM);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -47,7 +48,7 @@ clonetest(void)
 }
 
 void
-child_fork_test_func1(void *a, void *b) {
+clone_fork_test_func1(void *a, void *b) {
   int pid;
 
   pid = fork();
@@ -63,7 +64,7 @@ child_fork_test_func1(void *a, void *b) {
 }
 
 void
-child_fork_test_func2(void *a, void *b) {
+clone_fork_test_func2(void *a, void *b) {
   if(wait() < 0) 
     printf(1, "clone child fork test FAILED\n");
   else
@@ -72,20 +73,21 @@ child_fork_test_func2(void *a, void *b) {
 }
 
 void
-child_fork_test(void)
+clone_fork_test(void)
 {
   printf(1, "clone child fork test\n");
   a = 1;
   b = 2;
-  void *stack1 = malloc(4096), *stack2 = malloc(4096);
+  void *stack1 = malloc(PGSIZE), *stack2 = malloc(PGSIZE);
 
-  tid1 = clone(&child_fork_test_func1, (void *)&a, (void *)&b, stack1+4096, CLONE_THREAD);
+  tid1 = clone(&clone_fork_test_func1, (void *)&a, (void *)&b,
+              stack1+PGSIZE, CLONE_THREAD);
   if(tid1 < 0) {
     printf(1, "clone failed\n");
     exit();
   }
   sleep(100);
-  tid2 = clone(&child_fork_test_func2, (void *)&a, (void *)&b, stack2+4096, CLONE_THREAD);
+  tid2 = clone(&clone_fork_test_func2, (void *)&a, (void *)&b, stack2+PGSIZE, CLONE_THREAD);
   if(tid2 < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -118,18 +120,20 @@ void child_exec_test_func(void *a, void *b) {
 }
 
 void
-child_exec_test(void) {
+clone_exec_test(void) {
   printf(1, "child exec test\n");
   int n;
-  stack = malloc(4096);
-  tid = clone(&child_exec_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+  stack = malloc(PGSIZE);
+  tid = clone(&child_exec_test_func, (void *)&a, (void *)&b,
+              stack+PGSIZE, CLONE_THREAD | CLONE_VM);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
   }
   int tids[N];
   for(n=0; n<N; n++){
-    tids[n] = clone(&thread_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+    tids[n] = clone(&thread_func, (void *)&a, (void *)&b,
+                    stack+PGSIZE, CLONE_THREAD | CLONE_VM);
     if(tids[n] < 0) {
       printf(1, "clone failed\n");
       exit();
@@ -168,7 +172,7 @@ clone_files_test(void)
   printf(1, "clone files test\n");
   int fd;
   char str[10];
-  stack = malloc(4096);
+  stack = malloc(PGSIZE);
 
   fd = open("clone_files_test.txt", O_CREATE | O_RDWR);
   if(fd < 0) {
@@ -176,7 +180,8 @@ clone_files_test(void)
     exit();
   }
 
-  tid = clone(&clone_files_test_func, (void *)&fd, (void *)&b, stack+4096, CLONE_THREAD | CLONE_FILES);
+  tid = clone(&clone_files_test_func, (void *)&fd, (void *)&b,
+      stack+PGSIZE, CLONE_THREAD | CLONE_VM | CLONE_FILES);
   if(tid < 0) {
     printf(1, "clone failed\n");
     close(fd);
@@ -201,12 +206,13 @@ clone_files_test(void)
     exit();
   }
 
-  if(read(fd, str, 8) != 8 || strcmp(str, "testfile")) {
+  if(read(fd, str, 8) != 8 && strcmp(str, "testfile")) {
+    printf(1, "str is %s\n", str);
     printf(1, "clone files test FAILED\n");
     close(fd);
     exit();
   }
-  close(fd);
+  // close(fd);
   if(unlink("clone_files_test.txt") < 0){
     printf(1, "unlink failed\n");
     exit();
@@ -234,9 +240,10 @@ void
 clone_fs_test(void)
 {
   printf(1, "clone fs test\n");
-  stack = malloc(4096);
+  stack = malloc(PGSIZE);
 
-  tid = clone(&clone_fs_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_FS);
+  tid = clone(&clone_fs_test_func, (void *)&a, (void *)&b,
+              stack+PGSIZE, CLONE_THREAD | CLONE_FS);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -271,10 +278,10 @@ clone_vm_test()
 {
   printf(1, "clone vm test\n");
   glob = 0;
-  stack = malloc(4096);
+  stack = malloc(PGSIZE);
 
   tid = clone(&clone_vm_test_func, (void *)&a, (void *)&b,
-              stack+4096, CLONE_THREAD | CLONE_VM);
+              stack+PGSIZE, CLONE_THREAD | CLONE_VM);
 
   if(tid < 0) {
     printf(1, "clone failed\n");
@@ -312,7 +319,7 @@ void
 tkill_test()
 {
   printf(1, "tkill test\n");
-  tid = clone(&tkill_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+  tid = clone(&tkill_test_func, (void *)&a, (void *)&b, stack+PGSIZE, CLONE_THREAD);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -336,7 +343,8 @@ void
 gettid_test()
 {
   printf(1, "gettid test\n");
-  tid = clone(&gettid_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_VM);
+  tid = clone(&gettid_test_func, (void *)&a, (void *)&b,
+              stack+PGSIZE, CLONE_THREAD | CLONE_VM);
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
@@ -529,8 +537,8 @@ void multiplyMatrixThreadsUtil(void *arg, void *nouse) {
   kthread_exit();
 };
 
-#define MAT_M 3
-#define MAT_N 3
+#define MAT_M 4
+#define MAT_N 4
 
 void
 multiply_matrices()
@@ -579,14 +587,14 @@ main(void)
   kthread_test();
   kthread_lock_test();
   multiply_matrices();
-  clonetest();
+  clone_test();
   gettid_test();
   tkill_test();
   clone_stress_test();
-  child_fork_test();
+  clone_fork_test();
   clone_vm_test();
   clone_fs_test();
   clone_files_test();
-  child_exec_test();
+  clone_exec_test();
   exit();
 }

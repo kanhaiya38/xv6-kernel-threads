@@ -240,6 +240,7 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
   }
 
   np->flags = flags;
+  curproc->flags = curproc->flags | flags;
 
   // CLONE_PARENT flag
   // CLONE_PARENT first then CLONE_THREAD because

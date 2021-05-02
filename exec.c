@@ -33,14 +33,12 @@ exec(char *path, char **argv)
   // exec todo 1.
   // cprintf("thread count is %d", curproc->group_leader->pid);
   if(curproc->group_leader->thread_count > 1) {
-    cprintf("found a thread\n");
     acquire(&ptable.lock);
 
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(curproc->tgid == p->tgid && curproc->group_leader == p->group_leader) {
         if(p->pid == p->tgid && p->group_leader == p){
           curproc = p;
-          cprintf("now curproc is poiting to group leader\n");
         }
         else {
           release(&ptable.lock);
