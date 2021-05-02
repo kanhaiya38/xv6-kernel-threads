@@ -240,14 +240,6 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
     return -1;
   }
 
-  // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
-    kfree(np->kstack);
-    np->kstack = 0;
-    np->state = UNUSED;
-    return -1;
-  }
-
   np->flags = flags;
 
   // CLONE_PARENT flag
@@ -686,7 +678,7 @@ kill(int pid)
   return -1;
 }
 
-// Kill the process with the given pid.
+// Kill the thread with the given tid.
 // Process won't exit until it returns
 // to user space (see trap in trap.c).
 int
