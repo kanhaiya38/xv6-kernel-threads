@@ -68,8 +68,25 @@ sys_kill(void)
 }
 
 int
+sys_tkill(void)
+{
+  int pid;
+
+  if(argint(0, &pid) < 0)
+    return -1;
+  return tkill(pid);
+}
+
+int
 sys_getpid(void)
 {
+  return myproc()->tgid;
+}
+
+int
+sys_gettid(void)
+{
+  cprintf("inside gettid tid is %d\n", myproc()->pid);
   return myproc()->pid;
 }
 

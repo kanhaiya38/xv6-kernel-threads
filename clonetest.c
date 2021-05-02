@@ -282,6 +282,63 @@ clone_vm_test()
   printf(1, "clone vm test OK\n");
 }
 
+void tkill_test_func(void *a, void *b)
+{
+  sleep(10);
+  int pid;
+  pid = fork();
+  if(pid < 0){
+    printf(1, "fork failed\n");
+    exit();
+  } 
+  printf(1, "tkill test FAILED\n");
+  exit();
+}
+
+void
+tkill_test()
+{
+  printf(1, "tkill test\n");
+  tid = clone(&tkill_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  tkill(tid);
+  if(join(tid) < 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  printf(1, "tkill test OK\n");
+}
+
+void
+gettid_test_func(void *a, void *b)
+{
+  *(int *)a = gettid();
+  exit();
+}
+
+void
+gettid_test()
+{
+  printf(1, "gettid test\n");
+  tid = clone(&gettid_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_VM);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  // sleep(1000);
+  if(join(tid) < 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  if(tid != a) {
+    printf(1, "gettid test FAILED\n");
+    exit();
+  }
+  printf(1, "gettid test OK\n");
+}
 
 int
 main(void)
@@ -290,6 +347,8 @@ main(void)
   // child_fork_test();
   // child_exec_test();
   // clone_vm_test();
+  gettid_test();
+  // tkill_test();
   // clone_fs_test();
   // clone_files_test();
   exit();
