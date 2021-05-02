@@ -295,8 +295,19 @@ clone(void (*fn)(void *, void *), void *arg1, void *arg2, void *stack, int flags
   }
   // =============================
 
+  // CLONE_VM flag
+  if(flags & CLONE_VM) {
+    np->pgdir = curproc->pgdir;
+  } else {
+    if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+      kfree(np->kstack);
+      np->kstack = 0;
+      np->state = UNUSED;
+      return -1;
+    }
+  }
+  // =============================
   np->sz = curproc->group_leader->sz;
-  np->pgdir = curproc->pgdir;
   *np->tf = *curproc->tf;
 
   // Clear %eax so that clone returns 0 in the child.

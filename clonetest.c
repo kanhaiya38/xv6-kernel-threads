@@ -257,13 +257,47 @@ clone_fs_test(void)
   printf(1, "clone fs test OK\n");
 }
 
+int glob = 5;
+
+void
+clone_vm_test_func(void *a, void *b)
+{
+  glob++;
+  exit();
+}
+
+void
+clone_vm_test()
+{
+  printf(1, "clone vm test\n");
+  int a, tid, b;
+  void *stack = malloc(4096);
+
+  tid = clone(&clone_vm_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_VM);
+  if(tid < 0) {
+    printf(1, "clone failed\n");
+    exit();
+  }
+  if(join(tid)< 0) {
+    printf(1, "join failed\n");
+    exit();
+  }
+  if(glob != 6) {
+    printf(1, "clone vm test FAILED\n");
+    exit();
+  }
+  printf(1, "clone vm test OK\n");
+}
+
+
 int
 main(void)
 {
   // clonetest();
   // child_fork_test();
   // child_exec_test();
-  clone_fs_test();
-  clone_files_test();
+  // clone_fs_test();
+  // clone_files_test();
+  clone_vm_test();
   exit();
 }
