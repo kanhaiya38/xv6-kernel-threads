@@ -5,7 +5,7 @@
 #include "clone.h"
 
 #define N  0
-char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
+#define PGSIZE 4096
 int a, b;
 void *stack, *stack1, *stack2;
 int tid, tid1, tid2;
@@ -43,6 +43,7 @@ clonetest(void)
   printf(1, "arg1 is %d\n", a);
   printf(1, "arg2 is %d\n", b);
   printf(1, "basic clone test OK\n");
+  free(stack);
 }
 
 void
@@ -100,8 +101,11 @@ child_fork_test(void)
     exit();
   }
 
+  free(stack);
   printf(1, "clone child fork test OK\n");
 }
+
+char *echoargv[] = { "echo", "ALL", "TESTS", "PASSED", 0 };
 
 void child_exec_test_func(void *a, void *b) {
   // sleep(1000);
@@ -143,8 +147,8 @@ child_exec_test(void) {
     }
   }
 
+  free(stack);
   printf(1, "child exec test FAILED\n");
-  exit();
 }
 
 void
@@ -208,6 +212,7 @@ clone_files_test(void)
     exit();
   }
 
+  free(stack);
   printf(1, "clone files test OK\n");
 }
 
@@ -248,6 +253,7 @@ clone_fs_test(void)
     printf(1, "unlink failed\n");
     exit();
   }
+  free(stack);
   printf(1, "clone fs test OK\n");
 }
 
@@ -264,21 +270,28 @@ void
 clone_vm_test()
 {
   printf(1, "clone vm test\n");
+  glob = 0;
   stack = malloc(4096);
 
-  tid = clone(&clone_vm_test_func, (void *)&a, (void *)&b, stack+4096, CLONE_THREAD | CLONE_VM);
+  tid = clone(&clone_vm_test_func, (void *)&a, (void *)&b,
+              stack+4096, CLONE_THREAD | CLONE_VM);
+
   if(tid < 0) {
     printf(1, "clone failed\n");
     exit();
   }
+
   if(join(tid) < 0) {
     printf(1, "join failed\n");
     exit();
   }
-  if(glob != 6) {
+
+  if(glob != 1) {
     printf(1, "clone vm test FAILED\n");
     exit();
   }
+
+  free(stack);
   printf(1, "clone vm test OK\n");
 }
 
@@ -349,7 +362,7 @@ void kthread_test_func(void *a, void *b) {
 void
 kthread_test()
 {
-  printf(1, "basic kthread test\n");
+  printf(1, "kthread test\n");
   kthread_t kt;
   a = 1;
   b = 2;
@@ -369,7 +382,7 @@ kthread_test()
     exit();
   }
   
-  printf(1, "basic kthread test OK\n");
+  printf(1, "kthread test OK\n");
 }
 
 kthread_lock_t lock;
@@ -416,18 +429,164 @@ kthread_lock_test()
   printf(1, "kthread lock test OK\n");
 }
 
+
+#define MAX_CLONES 62
+void
+clone_stress_test()
+{
+  printf(1, "clone stress test\n");
+  int threads[MAX_CLONES];
+  void *stacks[MAX_CLONES];
+  int i;
+
+  for(i = 0; i < MAX_CLONES; i++) {
+    stacks[i] = malloc(PGSIZE);
+    if((threads[i] = clone(&thread_func, (void *)&a, (void *)&b,
+        stacks[i], CLONE_THREAD | CLONE_VM)) < 0) {
+      if(i == MAX_CLONES - 1) {
+        printf(1, "max threads created\n");
+        break;
+      } else {
+        printf(1, "clone stress test FAILED\n");
+      }
+      printf(1, "i is %d", i);
+      printf(1, "kthread_create failed\n");
+      exit();
+    }
+  }
+
+  for(i = 0; i < MAX_CLONES - 1; i++) {
+    if(join(threads[i]) < 0) {
+      printf(1, "kthread_join failed\n");
+      exit();
+    }
+  }
+
+  printf(1, "clone stress test OK\n");
+
+}
+
+typedef struct matrix {
+    int **data;
+    int row, col;
+} matrix;
+
+matrix mat1, mat2, mat3;
+#define MAX_THREADS 3
+
+void printMatrix(matrix *m)
+{
+  int row = m->row;
+  int col = m->col;
+  int **data = m->data;
+  int i, j;
+  printf(1, "%d %d\n", row, col);
+  for (i = 0; i < row; i++) {
+    for (j = 0; j < col; j++) printf(1, "%d ", data[i][j]);
+    printf(1, "\n");
+  }
+}
+
+void mallocMatrix(matrix *m, int row, int col) {
+  int **data = (int **)malloc(row * sizeof(int *));
+  int i;
+  // assert(data != NULL);
+  for (i = 0; i < row; i++) {
+    data[i] = (int *)malloc(col * sizeof(int));
+    // assert(data[i] != NULL);
+  }
+  m->row = row;
+  m->col = col;
+  m->data = data;
+}
+
+void multiplyMatrixThreadsUtil(void *arg, void *nouse) {
+  int t = *(int *)arg;
+  int m = mat1.row;
+  int n = mat2.col;
+  int p = mat1.col;
+  int avg_work = (m * n) / MAX_THREADS;
+  int rem_work = (m * n) % MAX_THREADS;
+  int op_start, op_end;
+  int i, j;
+  if (t == 0) {
+    op_start = avg_work * t;
+    op_end = (avg_work * (t + 1)) + rem_work;
+  } else {
+    op_start = avg_work * t + rem_work;
+    op_end = (avg_work * (t + 1)) + rem_work;
+  }
+  // printf(1, "%d - %d, %d\n", t, op_start, op_end);
+  for (i = op_start; i < op_end; i++) {
+    int row = i / n;
+    int col = i % n;
+    mat3.data[row][col] = 0;
+    for (j = 0; j < p; j++)
+      mat3.data[row][col] += mat1.data[row][j] * mat2.data[j][col];
+    // printf(1, "%d - %d - %d %d: %d\n", t, i, row, col, mat3.data[row][col]);
+  }
+  // printf(1, "complete\n");
+  kthread_exit();
+};
+
+#define MAT_M 3
+#define MAT_N 3
+
+void
+multiply_matrices()
+{
+  // multiplication
+  printf(1, "matrix multiplication test\n");
+  int t;
+  int m, n;
+  kthread_init_lock(&lock);
+
+  mallocMatrix(&mat1, MAT_M, MAT_N);
+  mallocMatrix(&mat2, MAT_M, MAT_N);
+  mallocMatrix(&mat3, MAT_M, MAT_N);
+
+  // mat1.row = MAT_M;
+  // mat2.col = MAT_N;
+  for(m = 0; m < MAT_M; m++) {
+    for(n = 0; n < MAT_N; n++) {
+      mat1.data[m][n] = m + n;
+    }
+  }
+
+  // mat1.row = MAT_M;
+  // mat2.col = MAT_N;
+  for(m = 0; m < MAT_M; m++) {
+    for(n = 0; n < MAT_N; n++) {
+      mat2.data[m][n] = 0;
+    }
+  }
+  printMatrix(&mat1);
+  printMatrix(&mat2);
+
+  kthread_t threads[MAX_THREADS];
+  for (t = 0; t < MAX_THREADS; t++) {
+    kthread_create(&threads[t], &multiplyMatrixThreadsUtil, (void *)&t, (void*)&a);
+  }
+  for (t = 0; t < MAX_THREADS; t++)
+    kthread_join(&threads[t]);
+  printMatrix(&mat3);
+  printf(1, "matrix multiplication test OK\n");
+}
+
 int
 main(void)
 {
-  // kthread_test();
+  kthread_test();
   kthread_lock_test();
-  // clonetest();
-  // child_fork_test();
-  // child_exec_test();
-  // clone_vm_test();
-  // gettid_test();
-  // tkill_test();
-  // clone_fs_test();
-  // clone_files_test();
+  multiply_matrices();
+  clonetest();
+  gettid_test();
+  tkill_test();
+  clone_stress_test();
+  child_fork_test();
+  clone_vm_test();
+  clone_fs_test();
+  clone_files_test();
+  child_exec_test();
   exit();
 }

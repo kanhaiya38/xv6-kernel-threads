@@ -222,7 +222,6 @@ fork(void)
   np->state = RUNNABLE;
 
   release(&ptable.lock);
-  cprintf("forking complete\n");
   return pid;
 }
 
@@ -339,8 +338,8 @@ exit(void)
   struct proc *p;
   int fd;
 
-  procdump();
-  cprintf("exiting %d\n", curproc->pid);
+  // procdump();
+  // cprintf("exiting %d\n", curproc->pid);
   if(curproc == initproc)
     panic("init exiting");
 
@@ -364,11 +363,11 @@ exit(void)
 
   // Parent might be sleeping in wait().
   if(curproc->group_leader == curproc) {
-    cprintf("parent wake up\n");
+    // cprintf("parent wake up\n");
     wakeup1(curproc->parent);
   }
   else {
-    cprintf("group leader wake up\n");
+    // cprintf("group leader wake up\n");
     wakeup1(curproc->group_leader);
   }
 
